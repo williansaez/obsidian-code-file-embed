@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-codefile",
-	"version": "1.1.0",
+	"version": "1.2.0",
 	"description": "Embed a vault file as a syntax-highlighted code block in Obsidian.",
 	"main": "main.js",
 	"scripts": {
