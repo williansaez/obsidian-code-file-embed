@@ -31,6 +31,29 @@ shortest-unique names work).
 - Optional clickable header showing the file path.
 - Configurable extension → language map and max file size in settings.
 
+## Obsidian Publish
+
+Publish does not run community plugins, so `codefile` blocks render empty on
+published sites. To publish, "bake" the embeds first:
+
+- **Bake code embeds in current note / all notes (for Publish)**: converts each
+  `codefile` block into a plain language fence carrying a marker, with the
+  code inlined:
+
+  ````markdown
+  ```abap codefile:_src/ZCL_MVO_UTIL.abap:150-219
+  ...embedded code...
+  ```
+  ````
+
+  Publish (and any other Markdown renderer) shows it as a normal highlighted
+  code block. Inside Obsidian's reading view the plugin recognizes the marker
+  and keeps rendering it as a live embed. Re-run the command any time to
+  refresh baked content from the source files; it is idempotent.
+
+- **Un-bake code embeds**: converts baked blocks back into empty `codefile`
+  blocks.
+
 ## Development
 
 ```bash

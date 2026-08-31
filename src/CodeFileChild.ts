@@ -8,10 +8,7 @@ import {
 import type CodeFilePlugin from "./main";
 import { CodeFileRef } from "./parser";
 import { extToLang, getExtension } from "./langMap";
-
-// Control chars that never appear in text files: NUL..BS and SO..US.
-// eslint-disable-next-line no-control-regex -- detecting control bytes is the whole point of the binary-file heuristic
-const BINARY_RE = /[\x00-\x08\x0e-\x1f]/;
+import { BINARY_RE, pickFence } from "./bake";
 
 /** Renders one `codefile` block and keeps it live-updated. */
 export class CodeFileChild extends MarkdownRenderChild {
@@ -148,14 +145,4 @@ export class CodeFileChild extends MarkdownRenderChild {
 			text: `⚠ codefile: ${msg}`,
 		});
 	}
-}
-
-/** Choose a fence longer than any backtick run inside the content. */
-function pickFence(content: string): string {
-	let longest = 0;
-	const runs = content.match(/`+/g);
-	if (runs) {
-		for (const run of runs) longest = Math.max(longest, run.length);
-	}
-	return "`".repeat(Math.max(3, longest + 1));
 }
