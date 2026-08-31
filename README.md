@@ -65,3 +65,25 @@ npm test       # unit tests (parser, langMap)
 
 Copy `main.js`, `manifest.json`, and `styles.css` into
 `<vault>/.obsidian/plugins/codefile/` to try it in a vault.
+
+### Releasing a new version
+
+Obsidian identifies releases by the version in `manifest.json`, and the GitHub
+release workflow ([release.yml](.github/workflows/release.yml)) refuses tags
+that don't match it. To ship a version:
+
+1. Bump the version (semver: new feature → minor, fix → patch) in three files,
+   keeping them identical: `manifest.json`, `package.json`, and add an entry to
+   `versions.json` mapping the new version to the minimum Obsidian
+   `minAppVersion` it needs (raise `minAppVersion` in `manifest.json` first if
+   the release uses newer APIs).
+2. Commit, then tag with the bare version (no `v` prefix — Obsidian's
+   convention) and push both:
+
+   ```bash
+   git tag 1.1.0 && git push origin main 1.1.0
+   ```
+
+3. The workflow runs tests, builds, attaches `main.js`, `manifest.json`, and
+   `styles.css` to a GitHub release with provenance attestation. Obsidian's
+   community-plugin updater picks the release up from there.
