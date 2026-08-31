@@ -9,6 +9,7 @@ import type CodeFilePlugin from "./main";
 import { CodeFileRef } from "./parser";
 import { extToLang, getExtension } from "./langMap";
 import { BINARY_RE, pickFence } from "./bake";
+import { formatHeaderLabel } from "./header";
 
 /** Renders one `codefile` block and keeps it live-updated. */
 export class CodeFileChild extends MarkdownRenderChild {
@@ -24,6 +25,7 @@ export class CodeFileChild extends MarkdownRenderChild {
 	}
 
 	onload(): void {
+		this.plugin.registerChild_(this);
 		void this.render();
 
 		this.registerEvent(
@@ -42,6 +44,15 @@ export class CodeFileChild extends MarkdownRenderChild {
 				},
 			),
 		);
+	}
+
+	onunload(): void {
+		this.plugin.unregisterChild_(this);
+	}
+
+	/** Re-render in place; used when plugin settings change. */
+	rerender(): void {
+		void this.render();
 	}
 
 	private async render(): Promise<void> {
@@ -107,6 +118,8 @@ export class CodeFileChild extends MarkdownRenderChild {
 
 		if (this.plugin.settings.showHeader) {
 			this.renderHeader(dest, rangeNote);
+		} else {
+			this.renderOpenButton(dest);
 		}
 
 		const body = el.createDiv({ cls: "codefile-body" });
@@ -117,25 +130,46 @@ export class CodeFileChild extends MarkdownRenderChild {
 
 	private renderHeader(file: TFile, rangeNote: string): void {
 		const header = this.containerEl.createDiv({ cls: "codefile-header" });
-		let label = file.path;
-		if (this.ref?.start !== undefined) {
-			const s = this.ref.start;
-			const e = this.ref.end ?? s;
-			label += e !== s ? `:${s}-${e}` : `:${s}`;
-		}
-		label += rangeNote;
+		const label =
+			formatHeaderLabel(
+				file.path,
+				this.ref?.start !== undefined
+					? { start: this.ref.start, end: this.ref.end }
+					: null,
+				this.plugin.settings.headerStyle,
+			) + rangeNote;
 		const link = header.createEl("a", {
 			cls: "codefile-link",
 			text: label,
 			href: "#",
 		});
+		link.setAttribute("title", file.path);
 		link.addEventListener("click", (ev) => {
 			ev.preventDefault();
-			void this.plugin.app.workspace.openLinkText(
-				file.path,
-				this.ctx.sourcePath,
-			);
+			this.openSource(file);
 		});
+	}
+
+	/** With the header hidden, keep a hover button to open the source file. */
+	private renderOpenButton(file: TFile): void {
+		const btn = this.containerEl.createEl("a", {
+			cls: "codefile-open-btn",
+			text: "✎",
+			href: "#",
+		});
+		btn.setAttribute("title", `Open ${file.path}`);
+		btn.setAttribute("aria-label", `Open ${file.path}`);
+		btn.addEventListener("click", (ev) => {
+			ev.preventDefault();
+			this.openSource(file);
+		});
+	}
+
+	private openSource(file: TFile): void {
+		void this.plugin.app.workspace.openLinkText(
+			file.path,
+			this.ctx.sourcePath,
+		);
 	}
 
 	private renderError(msg: string): void {
