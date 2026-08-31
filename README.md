@@ -1,3 +1,7 @@
+<a href="https://www.buymeacoffee.com/williansaez" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
+
+![License](https://img.shields.io/badge/license-MIT-green)
+
 # Code File Embed (Obsidian plugin)
 
 Embed the current contents of a vault file as a syntax-highlighted code block,
@@ -89,3 +93,4 @@ that don't match it. To ship a version:
 3. The workflow runs tests, builds, attaches `main.js`, `manifest.json`, and
    `styles.css` to a GitHub release with provenance attestation. Obsidian's
    community-plugin updater picks the release up from there.
+
