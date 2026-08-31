@@ -8,12 +8,15 @@ export interface CodeFileSettings {
 	maxFileSizeKb: number;
 	/** Extension -> language overrides, merged over the default map. */
 	langOverrides: Record<string, string>;
+	/** Re-bake notes automatically when a referenced source file is saved. */
+	autoBakeOnSourceChange: boolean;
 }
 
 export const DEFAULT_SETTINGS: CodeFileSettings = {
 	showHeader: true,
 	maxFileSizeKb: 512,
 	langOverrides: {},
+	autoBakeOnSourceChange: false,
 };
 
 /** Serialize overrides to `ext=lang` lines for the settings textarea. */
@@ -71,6 +74,20 @@ export class CodeFileSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						const n = parseInt(value, 10);
 						this.plugin.settings.maxFileSizeKb = Number.isFinite(n) && n >= 0 ? n : 0;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Auto-bake on source change")
+			.setDesc(
+				"When a source file referenced by a codefile block is saved, re-bake the notes that embed it (keeps baked blocks ready for Publish).",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.autoBakeOnSourceChange)
+					.onChange(async (value) => {
+						this.plugin.settings.autoBakeOnSourceChange = value;
 						await this.plugin.saveSettings();
 					}),
 			);

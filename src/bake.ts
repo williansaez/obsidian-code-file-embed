@@ -211,6 +211,16 @@ export function parseBakedFenceLine(line: string): string | null {
 	return info ? info[1] : null;
 }
 
+/**
+ * Cheap pre-filter for auto-bake: does this note contain any codefile block
+ * (live or baked) that could reference the given file name? Case-insensitive;
+ * may report false positives (the actual bake resolves precisely).
+ */
+export function mentionsCodeFileTarget(md: string, fileName: string): boolean {
+	const lower = md.toLowerCase();
+	return lower.includes("codefile") && lower.includes(fileName.toLowerCase());
+}
+
 /** Convert baked blocks back into empty `codefile` blocks. */
 export function unbakeMarkdown(md: string): UnbakeResult {
 	const lines = md.split("\n");

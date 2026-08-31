@@ -3,6 +3,7 @@ import {
 	bakeMarkdown,
 	unbakeMarkdown,
 	parseBakedFenceLine,
+	mentionsCodeFileTarget,
 	BakeOptions,
 } from "./bake";
 
@@ -168,6 +169,28 @@ describe("parseBakedFenceLine", () => {
 		expect(parseBakedFenceLine("```abap")).toBeNull();
 		expect(parseBakedFenceLine("```codefile _src/X.abap")).toBeNull();
 		expect(parseBakedFenceLine("plain text")).toBeNull();
+	});
+});
+
+describe("mentionsCodeFileTarget", () => {
+	test("matches a live codefile block referencing the file", () => {
+		const md = "```codefile _src/ZCL_MVO_UTIL.abap:150-219\n```";
+		expect(mentionsCodeFileTarget(md, "ZCL_MVO_UTIL.abap")).toBe(true);
+	});
+
+	test("matches a baked block referencing the file, case-insensitively", () => {
+		const md = "```abap codefile:_src/zcl_mvo_util.abap\ncode\n```";
+		expect(mentionsCodeFileTarget(md, "ZCL_MVO_UTIL.abap")).toBe(true);
+	});
+
+	test("rejects notes that never mention the file", () => {
+		const md = "```codefile _src/OTHER.abap\n```";
+		expect(mentionsCodeFileTarget(md, "ZCL_MVO_UTIL.abap")).toBe(false);
+	});
+
+	test("rejects notes that mention the file without any codefile block", () => {
+		const md = "See [[ZCL_MVO_UTIL.abap]] for details.";
+		expect(mentionsCodeFileTarget(md, "ZCL_MVO_UTIL.abap")).toBe(false);
 	});
 });
 

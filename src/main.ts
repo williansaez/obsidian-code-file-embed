@@ -15,13 +15,18 @@ import {
 	BINARY_RE,
 	BakeResult,
 	bakeMarkdown,
+	mentionsCodeFileTarget,
 	parseBakedFenceLine,
 	unbakeMarkdown,
 } from "./bake";
 import { extToLang, getExtension } from "./langMap";
 
+/** Delay before auto-baking after a source file save, to coalesce bursts. */
+const AUTO_BAKE_DEBOUNCE_MS = 2000;
+
 export default class CodeFilePlugin extends Plugin {
 	settings: CodeFileSettings = DEFAULT_SETTINGS;
+	private autoBakeTimers = new Map<string, number>();
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -79,11 +84,55 @@ export default class CodeFilePlugin extends Plugin {
 			callback: () => void this.runUnbake("all"),
 		});
 
+		// Auto-bake: when a non-markdown source file is saved, refresh the
+		// notes embedding it. Baking only ever rewrites markdown notes, which
+		// this handler ignores, so it cannot retrigger itself.
+		this.registerEvent(
+			this.app.vault.on("modify", (file) => {
+				if (!this.settings.autoBakeOnSourceChange) return;
+				if (!(file instanceof TFile) || file.extension === "md") return;
+				const pending = this.autoBakeTimers.get(file.path);
+				if (pending !== undefined) window.clearTimeout(pending);
+				this.autoBakeTimers.set(
+					file.path,
+					window.setTimeout(() => {
+						this.autoBakeTimers.delete(file.path);
+						void this.autoBakeFor(file);
+					}, AUTO_BAKE_DEBOUNCE_MS),
+				);
+			}),
+		);
+
 		this.addSettingTab(new CodeFileSettingTab(this.app, this));
 	}
 
+	onunload(): void {
+		for (const timer of this.autoBakeTimers.values()) {
+			window.clearTimeout(timer);
+		}
+		this.autoBakeTimers.clear();
+	}
+
+	/** Re-bake every note whose codefile blocks may reference this source. */
+	private async autoBakeFor(source: TFile): Promise<void> {
+		let changedNotes = 0;
+		for (const note of this.app.vault.getMarkdownFiles()) {
+			const md = await this.app.vault.cachedRead(note);
+			if (!mentionsCodeFileTarget(md, source.name)) continue;
+			const res = await this.bakeNote(note);
+			if (res.changed) changedNotes++;
+		}
+		if (changedNotes > 0) {
+			new Notice(
+				`codefile: ${source.name} mudou — ${changedNotes} nota(s) re-baked`,
+			);
+		}
+	}
+
 	/** Bake one note's markdown, writing back only when something changed. */
-	private async bakeNote(file: TFile): Promise<BakeResult> {
+	private async bakeNote(
+		file: TFile,
+	): Promise<BakeResult & { changed: boolean }> {
 		const md = await this.app.vault.read(file);
 		const res = await bakeMarkdown(md, {
 			resolve: async (linkpath) => {
@@ -105,10 +154,11 @@ export default class CodeFilePlugin extends Plugin {
 			langFor: (path) =>
 				extToLang(getExtension(path), this.settings.langOverrides),
 		});
-		if (res.output !== md) {
+		const changed = res.output !== md;
+		if (changed) {
 			await this.app.vault.modify(file, res.output);
 		}
-		return res;
+		return { ...res, changed };
 	}
 
 	private async runBake(scope: "current" | "all"): Promise<void> {
