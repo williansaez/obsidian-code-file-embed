@@ -1,5 +1,6 @@
 .codefile-embed {
 	margin: 0.4em 0;
+	position: relative;
 }
 
 .codefile-header {
@@ -29,6 +30,26 @@
 	margin-top: 0;
 	border-top-left-radius: 0;
 	border-top-right-radius: 0;
+}
+
+.codefile-open-btn {
+	position: absolute;
+	top: 6px;
+	right: 8px;
+	z-index: 1;
+	color: var(--text-faint);
+	font-size: var(--font-smallest);
+	text-decoration: none;
+	opacity: 0;
+	transition: opacity 120ms ease-in-out;
+}
+
+.codefile-embed:hover .codefile-open-btn {
+	opacity: 1;
+}
+
+.codefile-open-btn:hover {
+	color: var(--text-normal);
 }
 
 .codefile-overrides-input {

@@ -28,7 +28,9 @@ shortest-unique names work).
 - Syntax highlighting by extension, reusing Obsidian's own renderer (theme +
   copy button included).
 - Live update: the block re-renders when the target file is saved or renamed.
-- Optional clickable header showing the file path.
+- Optional clickable header showing the file path (or just the filename, via
+  the "Header content" setting); with the header hidden, a hover button in the
+  top-right corner still opens the source file.
 - Configurable extension → language map and max file size in settings.
 
 ## Obsidian Publish

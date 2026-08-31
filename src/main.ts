@@ -27,6 +27,17 @@ const AUTO_BAKE_DEBOUNCE_MS = 2000;
 export default class CodeFilePlugin extends Plugin {
 	settings: CodeFileSettings = DEFAULT_SETTINGS;
 	private autoBakeTimers = new Map<string, number>();
+	private activeChildren = new Set<CodeFileChild>();
+
+	/** Called by CodeFileChild.onload so settings changes can re-render it. */
+	registerChild_(child: CodeFileChild): void {
+		this.activeChildren.add(child);
+	}
+
+	/** Called by CodeFileChild.onunload. */
+	unregisterChild_(child: CodeFileChild): void {
+		this.activeChildren.delete(child);
+	}
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -248,5 +259,8 @@ export default class CodeFilePlugin extends Plugin {
 
 	async saveSettings(): Promise<void> {
 		await this.saveData(this.settings);
+		// Settings affect how every embed renders (header, size limit, langs):
+		// refresh live embeds so toggles take effect immediately (issue #1).
+		for (const child of this.activeChildren) child.rerender();
 	}
 }

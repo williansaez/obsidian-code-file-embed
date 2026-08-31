@@ -1,9 +1,12 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import type CodeFilePlugin from "./main";
+import { HeaderStyle } from "./header";
 
 export interface CodeFileSettings {
 	/** Show the clickable header with the file path above the code. */
 	showHeader: boolean;
+	/** What the header label shows: full vault path or just the filename. */
+	headerStyle: HeaderStyle;
 	/** Max file size in KB before refusing to embed (0 = unlimited). */
 	maxFileSizeKb: number;
 	/** Extension -> language overrides, merged over the default map. */
@@ -14,6 +17,7 @@ export interface CodeFileSettings {
 
 export const DEFAULT_SETTINGS: CodeFileSettings = {
 	showHeader: true,
+	headerStyle: "path",
 	maxFileSizeKb: 512,
 	langOverrides: {},
 	autoBakeOnSourceChange: false,
@@ -61,6 +65,21 @@ export class CodeFileSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.showHeader)
 					.onChange(async (value) => {
 						this.plugin.settings.showHeader = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Header content")
+			.setDesc("What the header label shows for each embed.")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("path", "Full vault path")
+					.addOption("filename", "Filename only")
+					.setValue(this.plugin.settings.headerStyle)
+					.onChange(async (value) => {
+						this.plugin.settings.headerStyle =
+							value === "filename" ? "filename" : "path";
 						await this.plugin.saveSettings();
 					}),
 			);
