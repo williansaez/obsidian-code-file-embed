@@ -245,3 +245,27 @@ export function unbakeMarkdown(md: string): UnbakeResult {
 	out.push(...lines.slice(cursor));
 	return { output: out.join("\n"), unbakedCount };
 }
+
+/** What a caller should do with a bake result, given the file's current text. */
+export type BakeWritePlan =
+	| { action: "write"; output: string }
+	| { action: "skip"; reason: "unchanged" | "file-changed" };
+
+/**
+ * Decide whether a bake result may be written back.
+ *
+ * `bakedFrom` is the note text the bake was computed from and `current` is the
+ * text at write time. Baking reads, does async work, then writes, so the note
+ * can move under it; writing the whole buffer back would then drop whatever
+ * was typed in between. A mismatch always wins over "nothing changed", so the
+ * caller can tell the user their edit blocked the bake.
+ */
+export function planBakeWrite(
+	bakedFrom: string,
+	output: string,
+	current: string,
+): BakeWritePlan {
+	if (current !== bakedFrom) return { action: "skip", reason: "file-changed" };
+	if (output === bakedFrom) return { action: "skip", reason: "unchanged" };
+	return { action: "write", output };
+}

@@ -16,6 +16,7 @@ import {
 	BakeResult,
 	bakeMarkdown,
 	mentionsCodeFileTarget,
+	planBakeWrite,
 	parseBakedFenceLine,
 	unbakeMarkdown,
 } from "./bake";
@@ -51,10 +52,12 @@ export default class CodeFilePlugin extends Plugin {
 			},
 		);
 
-		// Baked blocks (```<lang> codefile:<spec>) render natively everywhere;
-		// in reading view, upgrade them to the live embed when the source file
-		// still resolves, so they stay in sync while editing the vault.
+		// Baked blocks (```<lang> codefile:<spec>) render natively everywhere.
+		// Opt-in only: upgrading them to a live embed shows the source's
+		// current text while the note on disk still holds the baked snapshot,
+		// so what the author sees stops matching what gets published.
 		this.registerMarkdownPostProcessor((el, ctx) => {
+			if (!this.settings.livePreviewBakedBlocks) return;
 			if (!el.querySelector("pre > code")) return;
 			const info = ctx.getSectionInfo(el);
 			if (!info) return;
@@ -127,15 +130,20 @@ export default class CodeFilePlugin extends Plugin {
 	/** Re-bake every note whose codefile blocks may reference this source. */
 	private async autoBakeFor(source: TFile): Promise<void> {
 		let changedNotes = 0;
+		let skippedNotes = 0;
 		for (const note of this.app.vault.getMarkdownFiles()) {
 			const md = await this.app.vault.cachedRead(note);
 			if (!mentionsCodeFileTarget(md, source.name)) continue;
 			const res = await this.bakeNote(note);
 			if (res.changed) changedNotes++;
+			if (res.skipped) skippedNotes++;
 		}
-		if (changedNotes > 0) {
+		if (changedNotes > 0 || skippedNotes > 0) {
+			const skipped = skippedNotes
+				? `; ${skippedNotes} ignorada(s) por estarem a ser editadas`
+				: "";
 			new Notice(
-				`codefile: ${source.name} mudou — ${changedNotes} nota(s) re-baked`,
+				`codefile: ${source.name} mudou — ${changedNotes} nota(s) re-baked${skipped}`,
 			);
 		}
 	}
@@ -143,7 +151,7 @@ export default class CodeFilePlugin extends Plugin {
 	/** Bake one note's markdown, writing back only when something changed. */
 	private async bakeNote(
 		file: TFile,
-	): Promise<BakeResult & { changed: boolean }> {
+	): Promise<BakeResult & { changed: boolean; skipped: boolean }> {
 		const md = await this.app.vault.read(file);
 		const res = await bakeMarkdown(md, {
 			resolve: async (linkpath) => {
@@ -165,11 +173,23 @@ export default class CodeFilePlugin extends Plugin {
 			langFor: (path) =>
 				extToLang(getExtension(path), this.settings.langOverrides),
 		});
-		const changed = res.output !== md;
-		if (changed) {
-			await this.app.vault.modify(file, res.output);
-		}
-		return { ...res, changed };
+		if (res.output === md) return { ...res, changed: false, skipped: false };
+
+		// Vault.process hands back the note's text at write time, so a note
+		// edited while the bake was running is left alone instead of being
+		// overwritten with the buffer we read before those edits existed.
+		let changed = false;
+		let skipped = false;
+		await this.app.vault.process(file, (current) => {
+			const plan = planBakeWrite(md, res.output, current);
+			if (plan.action === "write") {
+				changed = true;
+				return plan.output;
+			}
+			skipped = plan.reason === "file-changed";
+			return current;
+		});
+		return { ...res, changed, skipped };
 	}
 
 	private async runBake(scope: "current" | "all"): Promise<void> {
@@ -184,6 +204,11 @@ export default class CodeFilePlugin extends Plugin {
 			for (const msg of [...res.errors, ...res.warnings]) {
 				problems.push(`${file.path}: ${msg}`);
 			}
+			if (res.skipped) {
+				problems.push(
+					`${file.path}: nota alterada durante o bake — não reescrita, corre o comando outra vez`,
+				);
+			}
 		}
 		this.report(`${baked} bloco(s) baked`, problems);
 	}
@@ -193,15 +218,27 @@ export default class CodeFilePlugin extends Plugin {
 		if (!files) return;
 
 		let unbaked = 0;
+		const skippedNotes: string[] = [];
 		for (const file of files) {
 			const md = await this.app.vault.read(file);
 			const res = unbakeMarkdown(md);
 			if (res.output !== md) {
-				await this.app.vault.modify(file, res.output);
+				await this.app.vault.process(file, (current) => {
+					if (current !== md) {
+						skippedNotes.push(file.path);
+						return current;
+					}
+					return res.output;
+				});
 			}
 			unbaked += res.unbakedCount;
 		}
-		this.report(`${unbaked} bloco(s) revertidos para codefile`, []);
+		this.report(
+			`${unbaked} bloco(s) revertidos para codefile`,
+			skippedNotes.map(
+				(p) => `${p}: nota alterada durante o un-bake — não reescrita`,
+			),
+		);
 	}
 
 	private targetFiles(scope: "current" | "all"): TFile[] | null {
