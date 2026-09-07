@@ -53,9 +53,15 @@ published sites. To publish, "bake" the embeds first:
   ````
 
   Publish (and any other Markdown renderer) shows it as a normal highlighted
-  code block. Inside Obsidian's reading view the plugin recognizes the marker
-  and keeps rendering it as a live embed. Re-run the command any time to
-  refresh baked content from the source files; it is idempotent.
+  code block, and so does Obsidian's reading view: a baked block displays the
+  snapshot that is actually in the note, so what you see is what gets
+  published. Re-run the command any time to refresh baked content from the
+  source files; it is idempotent.
+
+  Prefer an always-current preview over that guarantee? Turn on **Live preview
+  of baked blocks** in settings and baked blocks render from the source file
+  again — at the cost of reading view no longer matching what will be
+  published once the source drifts from the snapshot.
 
 - **Un-bake code embeds**: converts baked blocks back into empty `codefile`
   blocks.

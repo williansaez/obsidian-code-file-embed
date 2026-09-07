@@ -3,6 +3,7 @@ import {
 	bakeMarkdown,
 	unbakeMarkdown,
 	parseBakedFenceLine,
+	planBakeWrite,
 	mentionsCodeFileTarget,
 	BakeOptions,
 } from "./bake";
@@ -216,5 +217,36 @@ describe("unbakeMarkdown", () => {
 			.output;
 		const res = unbakeMarkdown(baked);
 		expect(res.output).toBe("```codefile _src/X.abap\n```");
+	});
+});
+
+describe("planBakeWrite", () => {
+	test("writes when the file is untouched and the bake changed something", () => {
+		expect(planBakeWrite("old", "new", "old")).toEqual({
+			action: "write",
+			output: "new",
+		});
+	});
+
+	test("skips when the bake produced no change", () => {
+		expect(planBakeWrite("same", "same", "same")).toEqual({
+			action: "skip",
+			reason: "unchanged",
+		});
+	});
+
+	test("refuses to write when the note changed since it was read", () => {
+		expect(planBakeWrite("old", "new", "edited by user")).toEqual({
+			action: "skip",
+			reason: "file-changed",
+		});
+	});
+
+	test("prefers reporting the concurrent edit over reporting no change", () => {
+		// Bake was a no-op, but the note moved on anyway: never clobber.
+		expect(planBakeWrite("old", "old", "edited by user")).toEqual({
+			action: "skip",
+			reason: "file-changed",
+		});
 	});
 });
