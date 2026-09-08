@@ -32,9 +32,13 @@ shortest-unique names work).
 - Syntax highlighting by extension, reusing Obsidian's own renderer (theme +
   copy button included).
 - Live update: the block re-renders when the target file is saved or renamed.
-- Optional clickable header showing the file path (or just the filename, via
-  the "Header content" setting); with the header hidden, a hover button in the
+- Optional clickable header showing the file path. The "Header content"
+  setting picks the full vault path, the filename only, or the path relative
+  to the note (`examples/demo.ts`, climbing with `../` when the file lives
+  outside the note's folder). With the header hidden, a hover button in the
   top-right corner still opens the source file.
+- Settings are searchable from Obsidian's settings search (1.13+); older
+  versions get the same tab rendered the classic way.
 - Configurable extension → language map and max file size in settings.
 
 ## Obsidian Publish
