@@ -137,6 +137,7 @@ export class CodeFileChild extends MarkdownRenderChild {
 					? { start: this.ref.start, end: this.ref.end }
 					: null,
 				this.plugin.settings.headerStyle,
+				this.ctx.sourcePath,
 			) + rangeNote;
 		const link = header.createEl("a", {
 			cls: "codefile-link",

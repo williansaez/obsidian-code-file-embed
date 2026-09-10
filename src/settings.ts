@@ -1,6 +1,15 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import {
+	App,
+	PluginSettingTab,
+	Setting,
+	type SettingDefinitionItem,
+} from "obsidian";
 import type CodeFilePlugin from "./main";
-import { overridesToText, textToOverrides } from "./settingsData";
+import {
+	readSettingValue,
+	settingDefinitions,
+	writeSettingValue,
+} from "./settingsData";
 
 export type { CodeFileSettings } from "./settingsData";
 export {
@@ -9,6 +18,12 @@ export {
 	textToOverrides,
 } from "./settingsData";
 
+/**
+ * Settings tab. On Obsidian 1.13+ the tab is rendered from
+ * `getSettingDefinitions()`, which also feeds the settings search (issue #3).
+ * Older versions never call it and fall back to `display()`, which renders
+ * the same definitions imperatively so `minAppVersion` can stay at 1.4.0.
+ */
 export class CodeFileSettingTab extends PluginSettingTab {
 	plugin: CodeFilePlugin;
 
@@ -17,90 +32,58 @@ export class CodeFileSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
+	getSettingDefinitions(): SettingDefinitionItem[] {
+		return settingDefinitions();
+	}
+
+	getControlValue(key: string): unknown {
+		return readSettingValue(this.plugin.settings, key);
+	}
+
+	async setControlValue(key: string, value: unknown): Promise<void> {
+		if (!writeSettingValue(this.plugin.settings, key, value)) return;
+		await this.plugin.saveSettings();
+	}
+
+	/** Fallback for Obsidian < 1.13, which has no declarative settings. */
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		new Setting(containerEl)
-			.setName("Show file header")
-			.setDesc("Display a clickable header with the file path above each embed.")
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.showHeader)
-					.onChange(async (value) => {
-						this.plugin.settings.showHeader = value;
-						await this.plugin.saveSettings();
-					}),
-			);
+		for (const def of settingDefinitions()) {
+			if (!("control" in def) || !def.control) continue;
+			const control = def.control;
+			const setting = new Setting(containerEl).setName(def.name);
+			if (def.desc) setting.setDesc(def.desc);
+			const save = (value: unknown) => void this.setControlValue(control.key, value);
+			const current = this.getControlValue(control.key);
 
-		new Setting(containerEl)
-			.setName("Header content")
-			.setDesc("What the header label shows for each embed.")
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOption("path", "Full vault path")
-					.addOption("filename", "Filename only")
-					.setValue(this.plugin.settings.headerStyle)
-					.onChange(async (value) => {
-						this.plugin.settings.headerStyle =
-							value === "filename" ? "filename" : "path";
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Max file size (KB)")
-			.setDesc("Refuse to embed files larger than this. Use 0 for no limit.")
-			.addText((text) =>
-				text
-					.setValue(String(this.plugin.settings.maxFileSizeKb))
-					.onChange(async (value) => {
-						const n = parseInt(value, 10);
-						this.plugin.settings.maxFileSizeKb = Number.isFinite(n) && n >= 0 ? n : 0;
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Auto-bake on source change")
-			.setDesc(
-				"When a source file referenced by a codefile block is saved, re-bake the notes that embed it (keeps baked blocks ready for Publish).",
-			)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.autoBakeOnSourceChange)
-					.onChange(async (value) => {
-						this.plugin.settings.autoBakeOnSourceChange = value;
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Live preview of baked blocks")
-			.setDesc(
-				"Render baked blocks from the source file instead of the baked snapshot. Off keeps reading view showing exactly what will be published; on trades that guarantee for an always-current preview.",
-			)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.livePreviewBakedBlocks)
-					.onChange(async (value) => {
-						this.plugin.settings.livePreviewBakedBlocks = value;
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Language overrides")
-			.setDesc("One per line as ext=language, e.g. abap=abap. Overrides the built-in map.")
-			.addTextArea((area) => {
-				area
-					.setValue(overridesToText(this.plugin.settings.langOverrides))
-					.onChange(async (value) => {
-						this.plugin.settings.langOverrides = textToOverrides(value);
-						await this.plugin.saveSettings();
+			switch (control.type) {
+				case "toggle":
+					setting.addToggle((t) => t.setValue(Boolean(current)).onChange(save));
+					break;
+				case "dropdown":
+					setting.addDropdown((d) => {
+						for (const [value, label] of Object.entries(control.options)) {
+							d.addOption(value, label);
+						}
+						d.setValue(String(current)).onChange(save);
 					});
-				area.inputEl.rows = 6;
-				area.inputEl.addClass("codefile-overrides-input");
-			});
+					break;
+				case "number":
+				case "text":
+					setting.addText((t) => t.setValue(String(current ?? "")).onChange(save));
+					break;
+				case "textarea":
+					setting.addTextArea((area) => {
+						area.setValue(String(current ?? "")).onChange(save);
+						if (control.rows) area.inputEl.rows = control.rows;
+						area.inputEl.addClass("codefile-overrides-input");
+					});
+					break;
+				default:
+					break;
+			}
+		}
 	}
 }
